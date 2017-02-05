@@ -1,0 +1,15 @@
+{
+  "name": "regexpsr",
+  "version": "0.0.0",
+  "description": "regular expression parser",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": {
+    "name": "JongChan Choi",
+    "email": "jong@chan.moe",
+    "url": "http://0xABCDEF.com/"
+  },
+  "license": "Zlib"
+}
