@@ -11,5 +11,8 @@
     "email": "jong@chan.moe",
     "url": "http://0xABCDEF.com/"
   },
-  "license": "Zlib"
+  "license": "Zlib",
+  "engines": {
+    "node" : ">=7"
+  }
 }
