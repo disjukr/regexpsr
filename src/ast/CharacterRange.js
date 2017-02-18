@@ -1,10 +1,71 @@
+const kLeadSurrogateStart = 0xd800;
 const kMaxCodePoint = 0x10ffff;
+const kRangeEndMarker = 0x110000;
+const kSpaceRanges = [
+    '\t'.charCodeAt(), '\r'.charCodeAt() + 1,
+    ' '.charCodeAt(), ' '.charCodeAt() + 1,
+    0x00A0, 0x00A1,
+    0x1680, 0x1681,
+    0x180E, 0x180F,
+    0x2000, 0x200B,
+    0x2028, 0x202A,
+    0x202F, 0x2030,
+    0x205F, 0x2060,
+    0x3000, 0x3001,
+    0xFEFF, 0xFF00,
+    kRangeEndMarker
+];
+const kWordRanges = [
+    '0'.charCodeAt(), '9'.charCodeAt() + 1,
+    'A'.charCodeAt(), 'Z'.charCodeAt() + 1,
+    '_'.charCodeAt(), '_'.charCodeAt() + 1,
+    'a'.charCodeAt(), 'z'.charCodeAt() + 1,
+    kRangeEndMarker
+];
+const kDigitRanges = [
+    '0'.charCodeAt(), '9'.charCodeAt() + 1,
+    kRangeEndMarker
+];
+const kSurrogateRanges = [
+    kLeadSurrogateStart, kLeadSurrogateStart + 1,
+    kRangeEndMarker
+];
+const kLineTerminatorRanges = [
+    0x000A, 0x000B,
+    0x000D, 0x000E,
+    0x2028, 0x202A,
+    kRangeEndMarker
+];
+
+function addClass(elmv, ranges) {
+    const elmc = elmv.length - 1;
+    console.assert(elmv[elmc] === kRangeEndMarker);
+    for (let i = 0; i < elmc; i += 2) {
+        console.assert(elmv[i] < elmv[i + 1]);
+        ranges.push(new CharacterRange(elmv[i], elmv[i + 1] - 1));
+    }
+}
+
+function addClassNegated(elmv, ranges) {
+    const elmc = elmv.length - 1;
+    console.assert(elmv[elmc] === kRangeEndMarker);
+    console.assert(elmv[0] !== 0x0000);
+    console.assert(elmv[elmc - 1] !== kMaxCodePoint);
+    let last = 0x0000;
+    for (let i = 0; i < elmc; i += 2) {
+        console.assert(last <= elmv[i] - 1);
+        console.assert(elmv[i] < elmv[i + 1]);
+        ranges.push(new CharacterRange(last, elmv[i] - 1));
+        last = elmv[i + 1];
+    }
+    ranges.push(new CharacterRange(last, kMaxCodePoint));
+}
 
 class CharacterRange { // https://github.com/v8/v8/blob/master/src/regexp/regexp-ast.h#L77
     constructor(from, to) {
-        console.assert(this.isValid);
         this.from = from;
         this.to = to;
+        console.assert(this.isValid);
     }
     get isValid() {
         return 0 <= this.from && this.to <= kMaxCodePoint && this.from <= this.to;
@@ -76,7 +137,41 @@ class CharacterRange { // https://github.com/v8/v8/blob/master/src/regexp/regexp
         }
         return negatedRanges;
     }
+    static addClassEscape(type, ranges) {
+        switch(type) {
+        case 's':
+            addClass(kSpaceRanges, ranges);
+            break;
+        case 'S':
+            addClassNegated(kSpaceRanges, ranges);
+            break;
+        case 'w':
+            addClass(kWordRanges, ranges);
+            break;
+        case 'W':
+            addClassNegated(kWordRanges, ranges);
+            break;
+        case 'd':
+            addClass(kDigitRanges, ranges);
+            break;
+        case 'D':
+            addClassNegated(kDigitRanges, ranges);
+            break;
+        case '.':
+            addClassNegated(kLineTerminatorRanges, ranges);
+            break;
+        case '*':
+            ranges.push(CharacterRange.everything);
+            break;
+        case 'n':
+            addClass(kLineTerminatorRanges, ranges);
+            break;
+        default:
+            throw new Error('unreachable');
+        }
+    }
 }
+CharacterRange.everything = new CharacterRange(0, kMaxCodePoint);
 
 function insertRangeInCanonicalList(list, count, insert) { // https://github.com/v8/v8/blob/master/src/regexp/jsregexp.cc#L5992
     const {from, to} = insert;
